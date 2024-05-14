@@ -21,6 +21,7 @@ typedef NS_ENUM(NSInteger, VCPickerShowType) {
     VCPickerShowTypePush, // 在当前业务页面向前 push
 };
 
+
 @interface VCPickerFloatingView : UIView <UIDynamicAnimatorDelegate>
 
 @property (nonatomic, assign) CGPoint startPoint; //触摸起始点
@@ -102,50 +103,29 @@ typedef NS_ENUM(NSInteger, VCPickerShowType) {
         !self.floatingBlock ?: self.floatingBlock();
         
     } else {
-        //移动
+        // 移动
         self.center = self.endPoint;
-        //计算距离最近的边缘 吸附到边缘停靠
+        
+        // 获取安全区域边界
+        UIEdgeInsets safeAreaInsets = self.superview.safeAreaInsets;
         CGFloat superwidth = self.superview.bounds.size.width;
         CGFloat superheight = self.superview.bounds.size.height;
         CGFloat endX = self.endPoint.x;
         CGFloat endY = self.endPoint.y;
-        CGFloat topRange = endY;//上距离
-        CGFloat bottomRange = superheight - endY;//下距离
-        CGFloat leftRange = endX;//左距离
-        CGFloat rightRange = superwidth - endX;//右距离
-        //比较上下左右距离 取出最小值
-        CGFloat minRangeTB = topRange > bottomRange ? bottomRange : topRange;//获取上下最小距离
-        CGFloat minRangeLR = leftRange > rightRange ? rightRange : leftRange;//获取左右最小距离
-        CGFloat minRange = minRangeTB > minRangeLR ? minRangeLR : minRangeTB;//获取最小距离
-        //判断最小距离属于上下左右哪个方向 并设置该方向边缘的point属性
-        CGPoint minPoint = CGPointZero;
-        if (minRange == topRange) {
-            //上
-            endX = endX - kScreenPadding < 0 ? kScreenPadding : endX;
-            endX = endX + kScreenPadding > superwidth ? superwidth - kScreenPadding : endX;
-            minPoint = CGPointMake(endX , 0 + kScreenPadding);
-        } else if(minRange == bottomRange){
-            //下
-            endX = endX - kScreenPadding < 0 ? kScreenPadding : endX;
-            endX = endX + kScreenPadding > superwidth ? superwidth - kScreenPadding : endX;
-            minPoint = CGPointMake(endX , superheight - kScreenPadding);
-            
-        } else if(minRange == leftRange){
-            //左
-            endY = endY - kScreenPadding < 0 ? kScreenPadding : endY;
-            endY = endY + kScreenPadding > superheight ? superheight - kScreenPadding : endY;
-            minPoint = CGPointMake(0 + kScreenPadding , endY);
-            
-        } else if(minRange == rightRange){
-            //右
-            endY = endY - kScreenPadding < 0 ? kScreenPadding : endY;
-            endY = endY + kScreenPadding > superheight ? superheight - kScreenPadding : endY;
-            minPoint = CGPointMake(superwidth - kScreenPadding , endY);
-        }
         
-        //添加吸附物理行为
+        // 计算边界
+        CGFloat minX = safeAreaInsets.left;
+        CGFloat maxX = superwidth - safeAreaInsets.right;
+        CGFloat minY = safeAreaInsets.top;
+        CGFloat maxY = superheight - safeAreaInsets.bottom;
+        
+        // 限制视图不能移动到超出安全区域边界的区域
+        endX = MAX(minX, MIN(endX, maxX));
+        endY = MAX(minY, MIN(endY, maxY));
+        
+        // 添加吸附物理行为
         UIAttachmentBehavior *attachmentBehavior = [[UIAttachmentBehavior alloc] initWithItem:self
-                                                                             attachedToAnchor:minPoint];
+                                                                             attachedToAnchor:CGPointMake(endX, endY)];
         [attachmentBehavior setLength:0];
         [attachmentBehavior setDamping:0.1];
         [attachmentBehavior setFrequency:5];
@@ -171,27 +151,27 @@ typedef NS_ENUM(NSInteger, VCPickerShowType) {
 
 // BreathingAnimation 呼吸动画
 - (void)highlightAnimation {
-   [UIView animateWithDuration:1.5f
+    [UIView animateWithDuration:1.5f
                      animations:^
      {
-         self.backgroundViewForHightlight.backgroundColor = [self.backgroundViewForHightlight.backgroundColor colorWithAlphaComponent:0.1f];
-     }
+        self.backgroundViewForHightlight.backgroundColor = [self.backgroundViewForHightlight.backgroundColor colorWithAlphaComponent:0.1f];
+    }
                      completion:^(BOOL finished)
      {
-         [self highlightAnimation];
-     }];
+        [self highlightAnimation];
+    }];
 }
 
 - (void)darkAnimation {
     [UIView animateWithDuration:1.5f
                      animations:^
      {
-         self.backgroundViewForHightlight.backgroundColor = [self.backgroundViewForHightlight.backgroundColor colorWithAlphaComponent:0.6f];
-     }
+        self.backgroundViewForHightlight.backgroundColor = [self.backgroundViewForHightlight.backgroundColor colorWithAlphaComponent:0.6f];
+    }
                      completion:^(BOOL finished)
      {
-         [self highlightAnimation];
-     }];
+        [self highlightAnimation];
+    }];
 }
 
 @end
@@ -247,7 +227,7 @@ static NSString *const kErrorKey = @"kErrorKey";
     CGFloat presentNaviWidth = 0.01;
     CGFloat heightRatio = 0.75;
     CGFloat errorLabelWidth = 20;
-
+    
     self.presentButton.frame = CGRectMake(horizontalMarigin,
                                           buttonVerticalMargin,
                                           buttonWidth,
@@ -703,8 +683,8 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
 
 //edit history
 - (void)tableView:(UITableView *)tableView
-        commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
-        forRowAtIndexPath:(NSIndexPath *)indexPath
+commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
+forRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [_historyArray removeObjectAtIndex:indexPath.row];
     [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationLeft];
@@ -851,8 +831,21 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
     }
     
     [keyWindow addSubview:vcpicker_floatingView];
+    // 添加观察者
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(presentedViewController:)
+                                                 name:@"UIViewControllerPresentedViewController"
+                                               object:nil];
 }
-
++ (void)presentedViewController:(NSNotification *)notification {
+    NSUInteger delaySecond = 1;
+    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delaySecond * NSEC_PER_SEC));
+    dispatch_after(delayTime, dispatch_get_main_queue(), ^{
+        UIWindow *keyWindow = [self getMainWindow];
+        [keyWindow bringSubviewToFront:vcpicker_floatingView];
+    });
+    
+}
 /**
  *  show VC picker 显示选择器
  */
@@ -1131,5 +1124,44 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
 }
 
 @end
+@implementation UIViewController (PresentTracking)
 
++ (void)load {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class class = [self class];
+        
+        SEL originalSelector = @selector(presentViewController:animated:completion:);
+        SEL swizzledSelector = @selector(track_presentViewController:animated:completion:);
+        
+        Method originalMethod = class_getInstanceMethod(class, originalSelector);
+        Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
+        
+        BOOL didAddMethod = class_addMethod(class, originalSelector, method_getImplementation(swizzledMethod), method_getTypeEncoding(swizzledMethod));
+        
+        if (didAddMethod) {
+            class_replaceMethod(class, swizzledSelector, method_getImplementation(originalMethod), method_getTypeEncoding(originalMethod));
+        } else {
+            method_exchangeImplementations(originalMethod, swizzledMethod);
+        }
+    });
+}
+
+- (void)track_presentViewController:(UIViewController *)viewControllerToPresent animated:(BOOL)flag completion:(void (^)(void))completion {
+    // 在此处执行你想要的操作，例如记录日志或者发送通知等
+    NSLog(@"presentViewController 方法被调用");
+    
+    // 调用原始的实现
+    [self track_presentViewController:viewControllerToPresent animated:flag completion:completion];
+    if ([[((UINavigationController *)viewControllerToPresent) topViewController] isKindOfClass:[VCPickerViewController class]]) {
+        
+    } else {
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"UIViewControllerPresentedViewController" object:self];
+    }
+    
+}
+
+@end
 #endif
+
+
