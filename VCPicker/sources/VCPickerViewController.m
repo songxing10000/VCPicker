@@ -379,7 +379,7 @@ static BOOL vcpicker_isActivated = NO;
  */
 static NSArray <NSDictionary *> *vcpicker_finalArray = nil;
 
-static BOOL vcpicker_needTitle = NO;
+static BOOL vcpicker_needTitle = YES;
 
 static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
 
@@ -543,33 +543,24 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
             UIViewController *controller = nil;
             NSMutableDictionary *dic = [NSMutableDictionary dictionary];
             
-            @try {
-                if (vcpicker_needTitle) {
-                    controller = [self makeInstanceWithClass:NSClassFromString(className)]; // nil
-                    [controller loadViewIfNeeded]; // to active viewDidLoad so we can get conroller.title
-                }
-                
-            } @catch (NSException *exception) {
-                NSLog(@"[VCPicker <%@> exception: %@]", className, exception);
-                dic[kErrorKey] = exception.description;
-                
-            } @finally {
-                NSString *title;
-                if (controller.title) {
-                    title = controller.title;
-                } else if (controller.navigationItem.title) {
-                    title = controller.navigationItem.title;
-                } else if (controller.tabBarItem.title) {
-                    title = controller.tabBarItem.title;
-                } else {
-                    title = className;
-                }
-                
-                dic[kNameKey] = className;
-                dic[kTitleKey] = title;
-                [self refreshHistoryForControllerInfo:dic];
-                [array addObject:dic];
+            NSString *title;
+            if (controller.title) {
+                title = controller.title;
+            } else if (controller.navigationItem.title) {
+                title = controller.navigationItem.title;
+            } else if (controller.tabBarItem.title) {
+                title = controller.tabBarItem.title;
+            } else {
+                title = className;
             }
+            
+            dic[kNameKey] = className;
+            if(title.length > 0){
+                dic[kTitleKey] = title;
+            }
+            [self refreshHistoryForControllerInfo:dic];
+            [array addObject:dic];
+            
         }
         
         vcpicker_finalArray = array;
@@ -682,14 +673,20 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
 }
 
 //edit history
+- (NSString *)tableView:(UITableView *)tableView titleForDeleteConfirmationButtonForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return @"删除";
+}
 - (void)tableView:(UITableView *)tableView
 commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
 forRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    [_historyArray removeObjectAtIndex:indexPath.row];
-    [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationLeft];
-    
-    [self synchronizeHistory];
+    if (editingStyle == UITableViewCellEditingStyleDelete) {
+        
+        [_historyArray removeObjectAtIndex:indexPath.row];
+        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationLeft];
+        
+        [self synchronizeHistory];
+    }
 }
 
 - (void)synchronizeHistory {
@@ -785,15 +782,15 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
 #pragma mark - Picker
 
 + (void)activateWhenDebug {
-    [self activateWhenDebugWithClassPrefixes:nil except:nil needTitle:NO];
+    [self activateWhenDebugWithClassPrefixes:nil except:nil needTitle:YES];
 }
 
 + (void)activateWhenDebugWithClassPrefixes:(NSArray <NSString *> *)prefixes {
-    [self activateWhenDebugWithClassPrefixes:prefixes except:nil needTitle:NO];
+    [self activateWhenDebugWithClassPrefixes:prefixes except:nil needTitle:YES];
 }
 
 + (void)activateWhenDebugWithClassPrefixes:(NSArray *)prefixes except:(NSArray *)exceptArray {
-    [self activateWhenDebugWithClassPrefixes:prefixes except:exceptArray needTitle:NO];
+    [self activateWhenDebugWithClassPrefixes:prefixes except:exceptArray needTitle:YES];
 }
 
 + (void)activateWhenDebugWithClassPrefixes:(NSArray<NSString *> *)prefixes
@@ -937,7 +934,73 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
             } else {
                 tobePresent = [[UINavigationController alloc] initWithRootViewController:controller];
             }
-            [rootVC presentViewController:tobePresent animated:YES completion:nil];
+            [rootVC presentViewController:tobePresent animated:YES completion:^{
+                // 查找title
+                NSArray<UIView *> *subviews = controller.view.subviews;
+                if(subviews.count >= 3) {
+                    for (UIView *subview in subviews) {
+                        if(subview.subviews.count >= 4){
+                            
+                            UIView *desView = subview.subviews[2];
+                            if (![desView isKindOfClass:[UILabel class]]){
+                                desView = subview.subviews[3];
+                                
+                            }
+                            if ([desView isKindOfClass:[UILabel class]]){
+                                UILabel *titleLab = (UILabel *)desView;
+                                NSString *title = titleLab.text;
+                                // 更新标题
+                                NSString *vcName = [NSStringFromClass([controller class]) componentsSeparatedByString: @"."].lastObject;
+                                NSInteger findIdx = -1;
+                                NSMutableDictionary *findDict = nil;
+                                for (int i = 0; i < self->_tempArray.count; ++i) {
+                                    NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary: self->_tempArray[i]];
+                                    NSString *saveStr = [dict[kNameKey] componentsSeparatedByString: @"."].lastObject;
+                                    if ([saveStr isEqualToString:vcName ]) {
+                                        dict[kTitleKey] = title;
+                                        findIdx = i;
+                                        findDict = dict;
+                                        break;
+                                    }
+                                }
+                                if (findIdx != -1) {
+                                    NSMutableArray *muArr = [NSMutableArray arrayWithArray:self->_tempArray];
+                                    muArr[findIdx] = findDict;
+                                    self->_tempArray = muArr;
+                                    // 刷新hist
+                                    NSInteger findIdx = -1;
+                                    for (int i = 0; i < self->_historyArray.count; ++i) {
+                                        NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary: self->_historyArray[i]];
+                                        NSString *saveStr = [dict[kNameKey] componentsSeparatedByString: @"."].lastObject;
+                                        if ([saveStr isEqualToString:vcName ]) {
+                                            findIdx = i;
+                                            break;
+                                        }
+                                    }
+                                    if (findIdx != -1) {
+                                        _historyArray[findIdx] = findDict;
+                                        [self synchronizeHistory];
+                                    }
+                                    
+                                    
+                                    [self handleMissingHistory];
+                                    [self.tableView reloadData];
+                                    break;
+                                }
+                                
+                            }
+                            
+                        }
+                    }
+                    
+                    
+                    
+                }
+                
+                
+                
+                
+            }];
             
             break;
         }
@@ -1153,11 +1216,18 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
     
     // 调用原始的实现
     [self track_presentViewController:viewControllerToPresent animated:flag completion:completion];
-    if ([[((UINavigationController *)viewControllerToPresent) topViewController] isKindOfClass:[VCPickerViewController class]]) {
+    
+    if ([viewControllerToPresent isKindOfClass:[UINavigationController class]]) {
         
-    } else {
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"UIViewControllerPresentedViewController" object:self];
+        UINavigationController *nav = (UINavigationController *)viewControllerToPresent;
+        
+        if (![[nav topViewController] isKindOfClass:[VCPickerViewController class]]) {
+            
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"UIViewControllerPresentedViewController" object:self];
+        }
     }
+    
+    
     
 }
 
