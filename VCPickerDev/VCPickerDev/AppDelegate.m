@@ -20,7 +20,7 @@
     // Override point for customization after application launch.
     
     // it's recommended to pass a class prefix array to ignore unused classes
-    [VCPickerViewController activateWhenDebugWithClassPrefixes:@[@"MY"]];
+    [VCPickerViewController activateWhenDebug];
     
     return YES;
 }

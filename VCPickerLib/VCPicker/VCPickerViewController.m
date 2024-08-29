@@ -934,6 +934,7 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
             } else {
                 tobePresent = [[UINavigationController alloc] initWithRootViewController:controller];
             }
+            
             [rootVC presentViewController:tobePresent animated:YES completion:^{
                 // 查找title
                 NSArray<UIView *> *subviews = controller.view.subviews;
@@ -1221,6 +1222,7 @@ BOOL classImplementsMethod(Class cls, SEL selector) {
 - (void)track_presentViewController:(UIViewController *)viewControllerToPresent animated:(BOOL)flag completion:(void (^)(void))completion {
     // 在此处执行你想要的操作，例如记录日志或者发送通知等
     NSLog(@"presentViewController 方法被调用");
+    viewControllerToPresent.modalPresentationStyle = UIModalPresentationPageSheet;
 
     // 调用原始的实现
     [self track_presentViewController:viewControllerToPresent animated:flag completion:completion];
@@ -1228,7 +1230,6 @@ BOOL classImplementsMethod(Class cls, SEL selector) {
     if ([viewControllerToPresent isKindOfClass:[UINavigationController class]]) {
         
         UINavigationController *nav = (UINavigationController *)viewControllerToPresent;
-        
         if (![[nav topViewController] isKindOfClass:[VCPickerViewController class]]) {
             
             [[NSNotificationCenter defaultCenter] postNotificationName:@"UIViewControllerPresentedViewController" object:self];
