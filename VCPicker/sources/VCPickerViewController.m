@@ -412,6 +412,26 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
     UISearchBar *searchBar = [[UISearchBar alloc] init];
     searchBar.placeholder = NSLocalizedString(@"Search", nil);
     searchBar.delegate = self;
+    // 设置占位符颜色
+    if ([searchBar respondsToSelector:@selector(valueForKey:)]) {
+        UITextField *textField = [searchBar valueForKey:@"searchField"];
+        if (textField) {
+            textField.attributedPlaceholder =
+            [[NSAttributedString alloc] initWithString:@"请输入搜索内容" attributes:@{NSForegroundColorAttributeName: [UIColor grayColor]}];
+            textField.textColor = [UIColor blackColor]; // 设置输入文本的颜色
+            
+            // 修改左侧放大镜图标颜色
+            UIImageView *leftIconView = (UIImageView *)textField.leftView;
+            if (leftIconView) {
+                // 获取放大镜图标的当前图像
+                UIImage *originalImage = leftIconView.image;
+                // 将放大镜图标渲染为新的颜色
+                UIImage *coloredImage = [originalImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+                leftIconView.image = coloredImage;
+                leftIconView.tintColor = [UIColor grayColor]; // 设置放大镜图标的颜色
+            }
+        }
+    }
     self.navigationItem.titleView = searchBar;
     
     [self loadHistoryData];
@@ -519,7 +539,7 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
         _cancelButton.layer.cornerRadius = 7.0f;
         
         [_cancelButton addTarget:self action:@selector(pickCancel) forControlEvents:UIControlEventTouchUpInside];
-        [_cancelButton setTitle:@"Cancel" forState:UIControlStateNormal];
+        [_cancelButton setTitle:@"取消" forState:UIControlStateNormal];
         [_cancelButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     }
     
@@ -628,7 +648,7 @@ static NSString *const vcpicker_searchHistoryKey = @"vcpicker.searchHistoryKey";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    return section ? @"Search ↓" : @"History ↓";
+    return section ? @"搜索 ↓" : @"历史 ↓";
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -850,6 +870,7 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
     UIViewController *rootVC = [self getMainWindow].rootViewController;
     UIViewController *selfVC = [self new];
     UINavigationController *naviedPickerVC = [[UINavigationController alloc] initWithRootViewController:selfVC];
+    naviedPickerVC.navigationBar.backgroundColor = [UIColor whiteColor];
     naviedPickerVC.navigationBar.barStyle = UIBarStyleBlack;
     
     if (rootVC.presentedViewController) {
