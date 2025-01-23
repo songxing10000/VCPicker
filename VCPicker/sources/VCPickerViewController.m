@@ -1057,7 +1057,7 @@ forRowAtIndexPath:(NSIndexPath *)indexPath
             if ([className hasPrefix:@"NS"]) continue;
             if ([className hasPrefix:@"_NS"]) continue;
             if ([className hasPrefix:@"__"]) continue;
-            if ([className hasPrefix:@"_"]) continue;
+//            if ([className hasPrefix:@"_"]) continue;
             if ([className hasPrefix:@"CMKApplication"]) continue;
             if ([className hasPrefix:@"CMKCamera"]) continue;
             if ([className hasPrefix:@"DeferredPU"]) continue;
